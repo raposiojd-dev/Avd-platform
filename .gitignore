@@ -1,0 +1,12 @@
+node_modules/
+.next/
+out/
+coverage/
+.env
+.env.*
+!.env.example
+*.log
+*.pem
+*.pfx
+local.settings.json
+.DS_Store

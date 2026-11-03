@@ -1,0 +1,21 @@
+{
+  "Name": "AVD Hibernate Watchdog Operator",
+  "IsCustom": true,
+  "Description": "Least-privilege role for the AVD hibernate watchdog: read VMs and session hosts, drain/undrain session hosts, deallocate/start VMs, and (optional) run the agent-restart command. Assign to the watchdog's managed identity at the resource group(s) holding the host pool and session hosts.",
+  "Actions": [
+    "Microsoft.Compute/virtualMachines/read",
+    "Microsoft.Compute/virtualMachines/instanceView/read",
+    "Microsoft.Compute/virtualMachines/deallocate/action",
+    "Microsoft.Compute/virtualMachines/start/action",
+    "Microsoft.Compute/virtualMachines/runCommand/action",
+    "Microsoft.DesktopVirtualization/hostpools/read",
+    "Microsoft.DesktopVirtualization/hostpools/sessionhosts/read",
+    "Microsoft.DesktopVirtualization/hostpools/sessionhosts/write"
+  ],
+  "NotActions": [],
+  "DataActions": [],
+  "NotDataActions": [],
+  "AssignableScopes": [
+    "/subscriptions/<SET-AT-DEPLOY>/resourceGroups/<SET-AT-DEPLOY>"
+  ]
+}

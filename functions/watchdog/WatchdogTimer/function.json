@@ -1,0 +1,12 @@
+{
+  "bindings": [
+    {
+      "name": "Timer",
+      "type": "timerTrigger",
+      "direction": "in",
+      "schedule": "%WATCHDOG_SCHEDULE%",
+      "runOnStartup": false,
+      "useMonitor": true
+    }
+  ]
+}
