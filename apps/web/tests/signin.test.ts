@@ -117,3 +117,13 @@ describe("settings store (local file mode)", () => {
     expect(m.settingsInput.safeParse({ ...input, bootstrapAdminUpn: "nope" }).success).toBe(false);
   });
 });
+
+import { safeReturnTo as srt } from "@/lib/session";
+describe("safeReturnTo hardening", () => {
+  it("blocks tab/control-char and backslash tricks", () => {
+    for (const v of ["/\t/evil.example", "/%09/evil.example".replace("%09", "\t"), "//evil.example", "/\\evil.example", "https://evil.example", "/a\nb"]) {
+      expect(srt(v)).toBe("/");
+    }
+    expect(srt("/hosts?pool=a")).toBe("/hosts?pool=a");
+  });
+});

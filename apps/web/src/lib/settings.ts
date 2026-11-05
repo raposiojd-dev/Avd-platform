@@ -85,8 +85,9 @@ export async function getSettings(force = false): Promise<AppSettings | null> {
   return value;
 }
 
-export async function saveSettings(input: z.infer<typeof settingsInput>, opts: { rotateSessionKey?: boolean } = {}): Promise<AppSettings> {
+export async function saveSettings(input: z.infer<typeof settingsInput>, opts: { rotateSessionKey?: boolean; createOnly?: boolean } = {}): Promise<AppSettings> {
   const prev = await getSettings(true);
+  if (opts.createOnly && prev) throw new Error("ALREADY_CONFIGURED");
   const next: AppSettings = {
     tenantId: input.tenantId,
     clientId: input.clientId,

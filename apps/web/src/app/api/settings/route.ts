@@ -28,7 +28,7 @@ export async function PUT(req: Request) {
   let body: unknown;
   try { body = await req.json(); } catch { return NextResponse.json({ error: "Invalid request." }, { status: 400 }); }
   const raw = (body ?? {}) as Record<string, unknown>;
-  const rotate = raw.rotateSessions === true;
+  
   const merged = { ...raw, clientSecret: typeof raw.clientSecret === "string" && raw.clientSecret.trim() ? raw.clientSecret : current.clientSecret };
   const parsed = settingsInput.and(z.object({ rotateSessions: z.boolean().optional() })).safeParse(merged);
   if (!parsed.success) {
@@ -37,6 +37,7 @@ export async function PUT(req: Request) {
   }
   const { rotateSessions: _r, ...input } = parsed.data;
   void _r;
+  const rotate = raw.rotateSessions === true || input.tenantId !== current.tenantId || input.clientId !== current.clientId;
   const credsChanged = input.tenantId !== current.tenantId || input.clientId !== current.clientId || input.clientSecret !== current.clientSecret;
   if (credsChanged) {
     const check = await verifyCredentials(input);

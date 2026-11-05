@@ -9,3 +9,9 @@
 - Elevation of privilege: custom least-privilege RBAC roles scoped to the managed resource groups only; write and Run Command roles are separate and off by default.
 
 Open items: restrict the web identity's Key Vault write access to the single settings secret (ABAC condition); federated credential instead of a client secret; rate limiting on sign-in;  nonce-based CSP (currently allows inline scripts for Next.js hydration); durable audit storage; the watchdog Function has settings validation but no automated tests yet; no end-to-end deploy into a clean subscription has been run.
+
+## Independent review of sign-in (fixed and open)
+
+Fixed: demo mode now refused on any Azure host (App Service, Container Apps, AKS) and the front door uses the same rule; open redirect via control characters in `returnTo`; logout now expires the `__Host-` cookie with the right attributes and checks Origin; setup is single-flight and the store refuses to overwrite (`createOnly`); changing tenant or client ID signs everyone out; session lifetime 8h to 4h.
+
+Open (tracked): sessions are stateless so a stolen cookie works until expiry (use Settings > sign everyone out; add session versioning and periodic role re-check); first admin is matched by email, bind to the Entra object ID on first sign-in instead; require `PUBLIC_BASE_URL` in production; a deleted Key Vault secret reopens setup (needs the log code); setup lockout is per instance.

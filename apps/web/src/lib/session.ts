@@ -5,7 +5,7 @@ import type { Principal, Role } from "./types";
 
 export const SESSION_COOKIE = process.env.NODE_ENV === "production" ? "__Host-tw_session" : "tw_session";
 export const LOGIN_COOKIE = process.env.NODE_ENV === "production" ? "__Host-tw_login" : "tw_login";
-export const SESSION_HOURS = 8;
+export const SESSION_HOURS = 4;
 const ROLES: Role[] = ["Reader", "Operator", "Admin"];
 
 const key = (b64: string) => Buffer.from(b64, "base64");
@@ -49,6 +49,12 @@ export async function verifyLoginState(token: string, sessionKey: string): Promi
 
 /** Only local paths; blocks open redirects such as //evil.example or https://evil.example. */
 export function safeReturnTo(v: string | null | undefined): string {
-  if (!v || !v.startsWith("/") || v.startsWith("//") || v.startsWith("/\\") || v.includes("://")) return "/";
+  if (!v || !v.startsWith("/") || /[\x00-\x20\\]/.test(v) || v.includes("://")) return "/";
+  try {
+    const u = new URL(v, "http://local.invalid");
+    if (u.origin !== "http://local.invalid") return "/";
+  } catch {
+    return "/";
+  }
   return v;
 }

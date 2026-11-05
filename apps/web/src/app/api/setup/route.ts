@@ -19,6 +19,8 @@ export async function GET(req: Request) {
 }
 
 // POST: the one-time setup. Allowed only while unconfigured, only with the setup code, only over HTTPS in production.
+let setupBusy = false;
+
 export async function POST(req: Request) {
   const blocked = assertSameOriginMutation(req);
   if (blocked) return blocked;
@@ -44,12 +46,23 @@ export async function POST(req: Request) {
       : NextResponse.json({ error: "That setup code is not right. Find it in the app's log stream." }, { status: 403 });
   }
 
-  const check = await verifyCredentials(parsed.data);
-  if (!check.ok) return NextResponse.json({ error: `Microsoft rejected these details. ${check.message}` }, { status: 400 });
-
+  // One setup at a time in this process; the store itself also refuses to overwrite (createOnly).
+  if (setupBusy) return NextResponse.json({ error: "Setup is already in progress." }, { status: 409 });
+  setupBusy = true;
   const { setupCode: _drop, ...input } = parsed.data;
   void _drop;
-  await saveSettings(input);
+  try {
+    const check = await verifyCredentials(parsed.data);
+    if (!check.ok) return NextResponse.json({ error: `Microsoft rejected these details. ${check.message}` }, { status: 400 });
+    try {
+      await saveSettings(input, { createOnly: true });
+    } catch (e) {
+      if (e instanceof Error && e.message === "ALREADY_CONFIGURED") return NextResponse.json({ error: "This site is already set up." }, { status: 409 });
+      throw e;
+    }
+  } finally {
+    setupBusy = false;
+  }
   retireSetupCode();
   writeAudit({ actor: input.bootstrapAdminUpn, action: "setup.completed", target: "site", outcome: "success", detail: "Entra app registration configured" });
   return NextResponse.json({ ok: true });

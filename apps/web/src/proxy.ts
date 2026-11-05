@@ -8,7 +8,8 @@ const PUBLIC = [/^\/setup(\/|$)/, /^\/api\/setup(\/|$)/, /^\/api\/health$/, /^\/
 const COOKIE = process.env.NODE_ENV === "production" ? "__Host-tw_session" : "tw_session";
 
 export function proxy(req: NextRequest) {
-  if (process.env.FLEET_PROVIDER === "demo" || process.env.AUTH_MODE === "easyauth") return NextResponse.next();
+  const hosted = !!(process.env.WEBSITE_SITE_NAME || process.env.CONTAINER_APP_NAME || process.env.KUBERNETES_SERVICE_HOST);
+  if ((process.env.FLEET_PROVIDER === "demo" && !hosted) || process.env.AUTH_MODE === "easyauth") return NextResponse.next();
   const { pathname, search } = req.nextUrl;
   if (PUBLIC.some((r) => r.test(pathname)) || req.cookies.has(COOKIE)) return NextResponse.next();
   if (pathname.startsWith("/api/")) return NextResponse.json({ error: "Not signed in." }, { status: 401 });
