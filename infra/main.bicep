@@ -293,6 +293,7 @@ module webApp 'modules/webapp.bicep' = {
     keyVaultUri: keyVault.outputs.vaultUri
     managedResourceGroupIds: managedResourceGroupIds
     enableWebActions: enableWebActions
+    watchdogMode: watchdogMode
   }
 }
 

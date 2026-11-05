@@ -54,14 +54,16 @@ param entraAppClientId string
 ])
 param unauthenticatedClientAction string = 'RedirectToLoginPage'
 
-@description('Paths that bypass authentication. Empty by default: every path requires sign-in.')
-param authExcludedPaths array = []
+@description('Paths that bypass authentication. Only the data-free liveness probe is excluded; every other path requires sign-in.')
+param authExcludedPaths array = [
+  '/api/health'
+]
 
 @description('Startup command. Next.js "output: standalone" builds are started with "node server.js".')
 param appCommandLine string = 'node server.js'
 
 @description('Optional health-check path (must be reachable by the platform; add it to authExcludedPaths if unauthenticated probes are required). Empty = disabled.')
-param healthCheckPath string = ''
+param healthCheckPath string = '/api/health'
 
 @description('Application Insights connection string.')
 param appInsightsConnectionString string
@@ -83,6 +85,17 @@ param managedResourceGroupIds array
 
 @description('Mirrors the enableWebActions deployment parameter so the UI can hide actions that RBAC would deny.')
 param enableWebActions bool
+
+@description('Watchdog mode, shown read-only on the Watchdog page. The real setting lives on the Function App.')
+@allowed([
+  'Report'
+  'Remediate'
+])
+param watchdogMode string = 'Report'
+
+// Subscription IDs the app reads fleet data from, derived from the managed resource group IDs
+// ("/subscriptions/<id>/resourceGroups/<name>"). Azure RBAC still limits what is actually visible.
+var managedSubscriptionIds = union(map(managedResourceGroupIds, rgId => split(rgId, '/')[2]), [])
 
 resource plan 'Microsoft.Web/serverfarms@2024-04-01' = {
   name: planName
@@ -158,8 +171,9 @@ resource appSettings 'Microsoft.Web/sites/config@2024-04-01' = {
     FLEET_PROVIDER: 'azure'
     AZURE_CLIENT_ID: fleetIdentityClientId
     AZURE_TENANT_ID: entraTenantId
-    FLEET_MANAGED_RESOURCE_GROUP_IDS: string(managedResourceGroupIds)
-    FLEET_WEB_ACTIONS_ENABLED: string(enableWebActions)
+    AVD_SUBSCRIPTION_IDS: join(managedSubscriptionIds, ',')
+    ENABLE_WEB_ACTIONS: toLower(string(enableWebActions))
+    WATCHDOG_MODE: watchdogMode
     KEY_VAULT_URI: keyVaultUri
     LOG_ANALYTICS_WORKSPACE_ID: workspaceCustomerId
     // --- Easy Auth federated credential (NOT a secret: it is a managed identity client ID) ----
