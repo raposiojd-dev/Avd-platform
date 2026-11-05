@@ -1,4 +1,4 @@
-# Skyline (working name)
+# Tidewatch
 
 A web console for Azure Virtual Desktop that deploys into **your own** Azure subscription. No credentials or data leave your tenant.
 
