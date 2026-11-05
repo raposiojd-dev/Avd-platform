@@ -66,11 +66,36 @@ export interface HostPool {
   maxSessionLimit: number | null;
 }
 
+/** A VM that sits in the same resource group(s) as the AVD fleet but is not registered as a session host. */
+export interface UnregisteredVm {
+  id: string;
+  name: string;
+  resourceGroup: string;
+  vmSize: string | null;
+  powerState: PowerState;
+}
+
+export type SessionState = "active" | "disconnected" | "other";
+
+export interface UserSession {
+  id: string;
+  user: string; // UPN
+  hostName: string;
+  hostId: string;
+  poolName: string;
+  state: SessionState;
+  rawState: string;
+  startedUtc: string | null;
+  application: string; // "Desktop" | "RemoteApp" | ""
+}
+
 export interface Fleet {
   generatedAtUtc: string;
   source: "demo" | "azure";
   pools: HostPool[];
   hosts: SessionHost[];
+  /** VMs in the managed resource groups that are not session hosts (orphans, new builds, file servers). */
+  unregistered: UnregisteredVm[];
   /** Hourly availability history per pool, newest last, 0..100 (demo data or from Log Analytics). */
   history: Record<string, number[]>;
   warnings: string[];

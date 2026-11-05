@@ -1,4 +1,4 @@
-import type { ActionResult, Fleet, HostAction, HostPool, SessionHost } from "../types";
+import type { ActionResult, Fleet, HostAction, HostPool, SessionHost, UnregisteredVm, UserSession } from "../types";
 import type { FleetProvider } from "./provider";
 
 // Deterministic fake estate for demos, screenshots and tests. Every name is fictional.
@@ -43,7 +43,7 @@ function build(): DemoState {
   poolDefs.forEach((p, pi) => {
     const pool = pools[pi]!;
     for (let i = 0; i < p.hosts; i++) {
-      const name = `${p.name.replace("hp-", "").slice(0, 7)}-${String(i + 1).padStart(2, "0")}`;
+      const name = `${p.name.replace("hp-", "").slice(0, 7).replace(/-+$/, "")}-${String(i + 1).padStart(2, "0")}`;
       const roll = rand();
       const base: SessionHost = {
         id: `${pool.id}/sessionHosts/${name}.contoso.local`,
@@ -92,6 +92,12 @@ function build(): DemoState {
   Object.assign(excluded, { excludedFromWatchdog: true });
   void byName;
 
+  const unregistered: UnregisteredVm[] = [
+    { id: "vm-build-01", name: "imgbuild-01", resourceGroup: "rg-avd-demo", vmSize: "Standard_D4s_v5", powerState: "deallocated" },
+    { id: "vm-fs-01", name: "fslogix-fs-01", resourceGroup: "rg-avd-demo", vmSize: "Standard_D4s_v5", powerState: "running" },
+    { id: "vm-old-07", name: "finance-07-old", resourceGroup: "rg-avd-demo", vmSize: "Standard_D8s_v5", powerState: "stopped" },
+  ];
+
   const history: Record<string, number[]> = {};
   pools.forEach((p, i) => {
     const r = rng(77 + i);
@@ -104,7 +110,7 @@ function build(): DemoState {
   });
 
   return {
-    fleet: { generatedAtUtc: new Date().toISOString(), source: "demo", pools, hosts, history, warnings: [] },
+    fleet: { generatedAtUtc: new Date().toISOString(), source: "demo", pools, hosts, unregistered, history, warnings: [] },
     readyAt: new Map(),
   };
 }
@@ -117,6 +123,27 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 export const demoProvider: FleetProvider = {
   source: "demo",
+
+  async getSessions() {
+    const s = state();
+    const r = rng(4242);
+    const first = ["Ava", "Noah", "Mia", "Liam", "Zoe", "Ethan", "Ivy", "Leo", "Ruby", "Jack", "Ella", "Oscar"];
+    const last = ["Nguyen", "Smith", "Patel", "Jones", "Kim", "Brown", "Singh", "Taylor", "Wong", "Evans"];
+    const sessions: UserSession[] = [];
+    for (const h of s.fleet.hosts) {
+      for (let i = 0; i < h.sessions; i++) {
+        const disc = r() < 0.35;
+        sessions.push({
+          id: `${h.id}/userSessions/${i + 1}`,
+          user: `${first[Math.floor(r() * first.length)]}.${last[Math.floor(r() * last.length)]}@contoso.example`,
+          hostName: h.name, hostId: h.id, poolName: h.poolName,
+          state: disc ? "disconnected" : "active", rawState: disc ? "Disconnected" : "Active",
+          startedUtc: new Date(Date.now() - Math.floor(r() * 9 * 3600_000)).toISOString(), application: "Desktop",
+        });
+      }
+    }
+    return { sessions, warnings: [] as string[] };
+  },
 
   async getFleet(): Promise<Fleet> {
     const s = state();

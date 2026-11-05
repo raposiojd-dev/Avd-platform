@@ -1,6 +1,6 @@
 "use client";
 
-import { Activity, LayoutDashboard, Moon, RefreshCw, Search, ServerCog, ScrollText, ShieldAlert } from "lucide-react";
+import { Activity, LayoutDashboard, Moon, RefreshCw, Search, ServerCog, ScrollText, ShieldAlert, Users } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useFleet } from "./fleet-context";
@@ -25,6 +25,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
     const base: Cmd[] = [
       { id: "ov", label: "Go to Overview", icon: <LayoutDashboard size={16} />, run: go("/") },
       { id: "hosts", label: "Go to Hosts", icon: <ServerCog size={16} />, run: go("/hosts") },
+      { id: "sess", label: "Go to Sessions", icon: <Users size={16} />, run: go("/sessions") },
       { id: "stuck", label: "Show stuck hosts", hint: "Hosts", icon: <ShieldAlert size={16} />, run: go("/hosts?filter=attention") },
       { id: "wd", label: "Go to Watchdog", icon: <Activity size={16} />, run: go("/watchdog") },
       { id: "au", label: "Go to Audit log", icon: <ScrollText size={16} />, run: go("/audit") },

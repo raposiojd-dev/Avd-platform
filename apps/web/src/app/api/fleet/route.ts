@@ -21,6 +21,7 @@ export async function GET() {
       pools: fleet.pools,
       history: fleet.history,
       hosts,
+      unregistered: fleet.unregistered,
       summary: summarize(fleet.hosts, now),
       me: { name: auth.principal.name, roles: auth.principal.roles, canAct: actionsEnabled() && hasRole(auth.principal, "Operator"), isAdmin: hasRole(auth.principal, "Admin") },
     });

@@ -1,6 +1,6 @@
 "use client";
 
-import { Activity, LayoutDashboard, Search, ScrollText, ServerCog, RefreshCw, Info } from "lucide-react";
+import { Activity, LayoutDashboard, Search, ScrollText, ServerCog, RefreshCw, Info, Users } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
@@ -12,6 +12,7 @@ import { ThemeToggle } from "./theme";
 const NAV = [
   { href: "/", label: "Overview", Icon: LayoutDashboard },
   { href: "/hosts", label: "Hosts", Icon: ServerCog },
+  { href: "/sessions", label: "Sessions", Icon: Users },
   { href: "/watchdog", label: "Watchdog", Icon: Activity },
   { href: "/audit", label: "Audit log", Icon: ScrollText },
 ];
@@ -104,7 +105,7 @@ export function Shell({ children }: { children: ReactNode }) {
         <main id="main" className="mx-auto w-full max-w-[1400px] px-4 py-6 sm:px-8 sm:py-8">{children}</main>
       </div>
 
-      <nav className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-4 border-t border-[var(--border)] bg-[var(--surface-solid)] lg:hidden" aria-label="Primary mobile">
+      <nav className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t border-[var(--border)] bg-[var(--surface-solid)] lg:hidden" aria-label="Primary mobile">
         {NAV.map(({ href, label, Icon }) => {
           const active = isActive(href);
           return (

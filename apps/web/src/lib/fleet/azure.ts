@@ -1,6 +1,6 @@
 import { DefaultAzureCredential } from "@azure/identity";
 import { getEnv } from "../env";
-import type { ActionResult, AgentStatus, Fleet, HostAction, HostPool, SessionHost } from "../types";
+import type { ActionResult, AgentStatus, Fleet, HostAction, HostPool, SessionHost, UnregisteredVm, UserSession } from "../types";
 import type { FleetProvider } from "./provider";
 
 // Live provider. Read path uses Azure Resource Graph (one query per object type, paged) plus the Compute
@@ -104,9 +104,9 @@ async function load(): Promise<Fleet> {
       subs,
       "desktopvirtualizationresources | where type =~ 'microsoft.desktopvirtualization/scalingplans' | mv-expand ref = properties.hostPoolReferences | where tobool(ref.scalingPlanEnabled) == true | project poolId = tolower(tostring(ref.hostPoolArmPath))",
     ),
-    argQuery<{ id: string; size: string; hib: string; tags: Record<string, string> | null }>(
+    argQuery<{ id: string; name: string; rg: string; size: string; hib: string; tags: Record<string, string> | null }>(
       subs,
-      "resources | where type =~ 'microsoft.compute/virtualmachines' | project id=tolower(id), size=tostring(properties.hardwareProfile.vmSize), hib=tostring(properties.additionalCapabilities.hibernationEnabled), tags",
+      "resources | where type =~ 'microsoft.compute/virtualmachines' | project id=tolower(id), name, rg=tolower(resourceGroup), size=tostring(properties.hardwareProfile.vmSize), hib=tostring(properties.additionalCapabilities.hibernationEnabled), tags",
     ),
   ]);
 
@@ -147,8 +147,8 @@ async function load(): Promise<Fleet> {
 
   const hosts: SessionHost[] = hostRows.flatMap((h) => {
     const poolId = h.id.split(/\/sessionhosts\//i)[0]!;
-    const pool = poolById.get(q(poolId));
-    if (!pool) return [];
+    // Never drop a host just because its pool was not returned (for example no read access to the pool).
+    const pool = poolById.get(q(poolId)) ?? { id: poolId, name: `${lastSeg(poolId)} (pool not readable)`, type: "Pooled" as const, subscriptionId: "", hasScalingPlan: false, startVmOnConnect: false, maxSessionLimit: null };
     const vmKey = q(h.vmid ?? "");
     const info = vmInfo.get(vmKey);
     const pw = power.get(vmKey);
@@ -175,14 +175,105 @@ async function load(): Promise<Fleet> {
     return [host];
   });
 
-  return { generatedAtUtc: new Date().toISOString(), source: "azure", pools, hosts, history: {}, warnings };
+  // VMs that live in the same resource groups as the fleet but are not registered as session hosts.
+  const registered = new Set(hostRows.map((h) => q(h.vmid ?? "")).filter(Boolean));
+  const fleetRgs = new Set<string>();
+  for (const h of hostRows) {
+    const m = /\/resourcegroups\/([^/]+)\//i.exec(h.vmid ?? "");
+    if (m) fleetRgs.add(m[1]!.toLowerCase());
+  }
+  for (const p of poolRows) {
+    const m = /\/resourcegroups\/([^/]+)\//i.exec(p.id);
+    if (m) fleetRgs.add(m[1]!.toLowerCase());
+  }
+  const unregistered: UnregisteredVm[] = vmRows
+    .filter((v) => fleetRgs.has(v.rg) && !registered.has(v.id))
+    .map((v) => ({ id: v.id, name: v.name, resourceGroup: v.rg, vmSize: v.size || null, powerState: power.get(v.id)?.power ?? "unreadable" }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+
+  if (hosts.some((h) => h.poolName.endsWith("(pool not readable)"))) {
+    warnings.push("Some session hosts belong to a host pool this identity cannot read. They are listed under their pool id.");
+  }
+  return { generatedAtUtc: new Date().toISOString(), source: "azure", pools, hosts, unregistered, history: {}, warnings };
 }
 
 let cache: { at: number; fleet: Fleet } | null = null;
 let inflight: Promise<Fleet> | null = null;
 
+// ---- User sessions ----------------------------------------------------------------------------------
+// One ARM call per host pool that currently has sessions (the host list already carries session counts, so
+// empty pools cost nothing). Cached for a minute and fetched only when the Sessions page asks, to stay well
+// inside ARM read throttling. https://learn.microsoft.com/rest/api/desktopvirtualization/user-sessions/list
+interface UserSessionRow {
+  id: string;
+  properties?: { userPrincipalName?: string; activeDirectoryUserName?: string; sessionState?: string; createTime?: string; applicationType?: string };
+}
+const SESSION_CACHE_MS = 60_000;
+let sessionCache: { at: number; value: { sessions: UserSession[]; warnings: string[] } } | null = null;
+let sessionInflight: Promise<{ sessions: UserSession[]; warnings: string[] }> | null = null;
+
+async function poolSessions(pool: HostPool): Promise<UserSession[]> {
+  const out: UserSession[] = [];
+  let url: string | undefined = `${ARM}${pool.id}/userSessions?api-version=2024-04-03`;
+  for (let page = 0; url && page < 50; page++) {
+    const res = await arm(url);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const j = (await res.json()) as { value?: UserSessionRow[]; nextLink?: string };
+    for (const r of j.value ?? []) {
+      const raw = r.properties?.sessionState ?? "";
+      const hostId = r.id.split(/\/usersessions\//i)[0] ?? "";
+      out.push({
+        id: r.id,
+        user: r.properties?.userPrincipalName || r.properties?.activeDirectoryUserName || "unknown",
+        hostName: lastSeg(hostId).split(".")[0]!,
+        hostId,
+        poolName: pool.name,
+        state: raw.toLowerCase() === "active" ? "active" : raw.toLowerCase() === "disconnected" ? "disconnected" : "other",
+        rawState: raw,
+        startedUtc: r.properties?.createTime ?? null,
+        application: r.properties?.applicationType ?? "",
+      });
+    }
+    url = j.nextLink && j.nextLink.startsWith(`${ARM}/`) ? j.nextLink : undefined;
+  }
+  return out;
+}
+
+async function loadSessions(): Promise<{ sessions: UserSession[]; warnings: string[] }> {
+  const fleet = await azureProvider.getFleet();
+  const withSessions = new Set(fleet.hosts.filter((h) => h.sessions > 0).map((h) => q(h.poolId)));
+  const targets = fleet.pools.filter((p) => withSessions.has(q(p.id)));
+  const sessions: UserSession[] = [];
+  const failed: string[] = [];
+  let next = 0;
+  const worker = async () => {
+    while (next < targets.length) {
+      const pool = targets[next++]!;
+      try {
+        sessions.push(...(await poolSessions(pool)));
+      } catch (e) {
+        failed.push(`${pool.name} (${(e as Error).message})`);
+      }
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(6, targets.length) }, worker)); // modest concurrency on purpose
+  const warnings = failed.length ? [`Sessions could not be read for ${failed.length} host pool(s): ${failed.slice(0, 5).join(", ")}${failed.length > 5 ? ", and more" : ""}.`] : [];
+  sessions.sort((a, b) => a.user.localeCompare(b.user));
+  return { sessions, warnings };
+}
+
 export const azureProvider: FleetProvider = {
   source: "azure",
+
+  async getSessions() {
+    if (sessionCache && Date.now() - sessionCache.at < SESSION_CACHE_MS) return sessionCache.value;
+    sessionInflight ??= loadSessions().finally(() => {
+      sessionInflight = null;
+    });
+    const value = await sessionInflight;
+    sessionCache = { at: Date.now(), value };
+    return value;
+  },
 
   async getFleet(): Promise<Fleet> {
     if (cache && Date.now() - cache.at < CACHE_MS) return cache.fleet;
