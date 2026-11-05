@@ -41,11 +41,18 @@ param authIdentityId string
 @description('Client ID of the Easy Auth identity. Set as OVERRIDE_USE_MI_FIC_ASSERTION_CLIENTID.')
 param authIdentityClientId string
 
-@description('Microsoft Entra tenant ID (directory) that users sign in against.')
-param entraTenantId string
+@description('builtin: the app does its own sign-in (settings entered on the Setup page). easyauth: App Service Authentication does it.')
+@allowed([
+  'builtin'
+  'easyauth'
+])
+param authMode string = 'builtin'
 
-@description('Client (application) ID of the Entra app registration for this web app.')
-param entraAppClientId string
+@description('Only for easyauth: Microsoft Entra tenant ID (directory) that users sign in against.')
+param entraTenantId string = ''
+
+@description('Only for easyauth: client (application) ID of the Entra app registration for this web app.')
+param entraAppClientId string = ''
 
 @description('What Easy Auth does with an unauthenticated request. Both options REJECT anonymous traffic; AllowAnonymous is deliberately not offered.')
 @allowed([
@@ -159,6 +166,11 @@ resource scmPolicy 'Microsoft.Web/sites/basicPublishingCredentialsPolicies@2024-
   }
 }
 
+var easyAuthSettings = authMode == 'easyauth' ? {
+  // Easy Auth federated credential (NOT a secret: it is a managed identity client ID).
+  OVERRIDE_USE_MI_FIC_ASSERTION_CLIENTID: authIdentityClientId
+} : {}
+
 var telemetryAuth = appInsightsEntraAuth ? {
   APPLICATIONINSIGHTS_AUTHENTICATION_STRING: 'ClientId=${fleetIdentityClientId};Authorization=AAD'
 } : {}
@@ -176,18 +188,19 @@ resource appSettings 'Microsoft.Web/sites/config@2024-04-01' = {
     WATCHDOG_MODE: watchdogMode
     KEY_VAULT_URI: keyVaultUri
     LOG_ANALYTICS_WORKSPACE_ID: workspaceCustomerId
-    // --- Easy Auth federated credential (NOT a secret: it is a managed identity client ID) ----
-    OVERRIDE_USE_MI_FIC_ASSERTION_CLIENTID: authIdentityClientId
+    AUTH_MODE: authMode
     // --- Platform ------------------------------------------------------------------------------
     APPLICATIONINSIGHTS_CONNECTION_STRING: appInsightsConnectionString
     ApplicationInsightsAgent_EXTENSION_VERSION: '~3'
     WEBSITE_RUN_FROM_PACKAGE: '1'
     SCM_DO_BUILD_DURING_DEPLOYMENT: 'false'
     NODE_ENV: 'production'
-  }, telemetryAuth)
+  }, telemetryAuth, easyAuthSettings)
 }
 
-resource authSettings 'Microsoft.Web/sites/config@2024-04-01' = {
+// Only when App Service Authentication is chosen. In builtin mode the app signs people in itself, and this
+// resource is absent so the first-run Setup page is reachable.
+resource authSettings 'Microsoft.Web/sites/config@2024-04-01' = if (authMode == 'easyauth') {
   parent: webApp
   name: 'authsettingsV2'
   dependsOn: [

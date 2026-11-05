@@ -51,11 +51,18 @@ param enableWebActions bool = false
 // ---------------------------------------------------------------------------------------------------
 // Sign-in (Microsoft Entra ID, via App Service Authentication)
 // ---------------------------------------------------------------------------------------------------
-@description('Microsoft Entra tenant (directory) ID that administrators sign in against.')
-param entraTenantId string
+@description('builtin = the app signs people in itself; the Entra app registration is entered on the site\'s first-run Setup page and stored in Key Vault, so no IDs are needed at deployment. easyauth = App Service Authentication signs people in; then entraTenantId and entraAppClientId are required here.')
+@allowed([
+  'builtin'
+  'easyauth'
+])
+param authMode string = 'builtin'
 
-@description('Client (application) ID of the Entra app registration created for the web app. See README step 2.')
-param entraAppClientId string
+@description('Only for authMode easyauth: Microsoft Entra tenant (directory) ID.')
+param entraTenantId string = ''
+
+@description('Only for authMode easyauth: client (application) ID of the Entra app registration.')
+param entraAppClientId string = ''
 
 @description('Behaviour for unauthenticated requests. Anonymous access is never allowed.')
 @allowed([
@@ -284,6 +291,7 @@ module webApp 'modules/webapp.bicep' = {
     fleetIdentityClientId: identity.outputs.fleetWeb.clientId
     authIdentityId: identity.outputs.webAuth.id
     authIdentityClientId: identity.outputs.webAuth.clientId
+    authMode: authMode
     entraTenantId: entraTenantId
     entraAppClientId: entraAppClientId
     unauthenticatedClientAction: unauthenticatedClientAction
@@ -326,17 +334,17 @@ output platformResourceGroup string = platformRg.name
 output webAppUrl string = 'https://${webApp.outputs.defaultHostName}'
 
 @description('Redirect URI to register on the Entra app registration (Web platform).')
-output entraRedirectUri string = 'https://${webApp.outputs.defaultHostName}/.auth/login/aad/callback'
+output entraRedirectUri string = authMode == 'easyauth' ? 'https://${webApp.outputs.defaultHostName}/.auth/login/aad/callback' : 'https://${webApp.outputs.defaultHostName}/auth/callback'
 
 @description('Values for the federated identity credential to add to the Entra app registration (README step 3).')
-output entraFederatedCredential object = {
+output entraFederatedCredential object = authMode == 'easyauth' ? {
   name: 'avd-platform-web-easyauth'
   issuer: '${environment().authentication.loginEndpoint}${entraTenantId}/v2.0'
   subject: identity.outputs.webAuth.principalId
   audiences: [
     'api://AzureADTokenExchange'
   ]
-}
+} : {}
 
 output webAppName string = webApp.outputs.name
 output functionAppName string = watchdogApp.outputs.name

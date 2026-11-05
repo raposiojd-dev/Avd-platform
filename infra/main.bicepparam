@@ -23,10 +23,9 @@ param managedResourceGroupIds = [
 param enableAgentRestart = false               // Run Command = script execution as SYSTEM. Leave off unless needed.
 param enableWebActions = false                 // false = web app is read-only on the fleet.
 
-// --- Sign-in (create the app registration first: README step 2) -------------------------------------
-param entraTenantId = '00000000-0000-0000-0000-000000000000'
-param entraAppClientId = '00000000-0000-0000-0000-000000000000'
-param unauthenticatedClientAction = 'RedirectToLoginPage'
+// --- Sign-in ----------------------------------------------------------------------------------------
+// 'builtin' (default): no IDs here. After deploying, open the site and complete the one-time Setup page.
+param authMode = 'builtin'
 
 // --- Watchdog ---------------------------------------------------------------------------------------
 param watchdogMode = 'Report'                  // Start in Report. Switch to Remediate (and redeploy) once findings look right.

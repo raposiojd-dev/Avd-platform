@@ -33,7 +33,10 @@ var roleBlobOwner = subscriptionResourceId('Microsoft.Authorization/roleDefiniti
 var roleQueueContributor = subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '974c5e8b-45b9-4653-ba55-5f855dd0fb88')
 var roleTableContributor = subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '0a9a7e1f-b9d0-4cc4-a60d-0319b160aaa3')
 var roleMetricsPublisher = subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '3913510d-42f4-4e42-8a64-420c390055eb')
-var roleKeyVaultSecretsUser = subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '4633458b-17de-408a-b874-0445c86b69e6')
+// Secrets Officer (read AND write secrets) because the web app stores the Entra app registration entered on its
+// Setup page as one secret. Scoped to this product's own vault only.
+// https://learn.microsoft.com/azure/role-based-access-control/built-in-roles/security#key-vault-secrets-officer
+var roleKeyVaultSecretsUser = subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'b86a8fe4-44ce-4948-aee5-eccb2c155cd7')
 var roleLogAnalyticsDataReader = subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '3b03c2da-16b3-4a49-8834-0f8130efdd3b')
 
 resource storage 'Microsoft.Storage/storageAccounts@2023-05-01' existing = {

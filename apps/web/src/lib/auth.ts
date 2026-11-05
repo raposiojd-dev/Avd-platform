@@ -1,5 +1,7 @@
-import { headers } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { getEnv } from "./env";
+import { SESSION_COOKIE, verifySession } from "./session";
+import { getSettings } from "./settings";
 import type { Principal, Role } from "./types";
 
 const ROLE_ORDER: Role[] = ["Reader", "Operator", "Admin"];
@@ -44,6 +46,14 @@ export async function getPrincipal(): Promise<Principal | null> {
   if (getEnv().FLEET_PROVIDER === "demo") {
     return { id: "demo-user", name: "Demo Admin", roles: ["Admin"] };
   }
-  const h = await headers();
-  return parseClientPrincipal(h.get("x-ms-client-principal"));
+  if (getEnv().AUTH_MODE === "easyauth") {
+    const h = await headers();
+    return parseClientPrincipal(h.get("x-ms-client-principal"));
+  }
+  // Built-in sign-in: a signed cookie issued by /auth/callback.
+  const token = (await cookies()).get(SESSION_COOKIE)?.value;
+  if (!token) return null;
+  const settings = await getSettings();
+  if (!settings) return null;
+  return verifySession(token, settings.sessionKey);
 }

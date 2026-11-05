@@ -6,6 +6,13 @@ const schema = z.object({
   AZURE_CLIENT_ID: z.string().optional(),
   ENABLE_WEB_ACTIONS: z.enum(["true", "false"]).default("false"),
   WATCHDOG_MODE: z.enum(["Report", "Remediate"]).default("Report"),
+  // "builtin": the app signs people in itself with the Entra app registration entered on the Setup page.
+  // "easyauth": App Service Authentication does it and the app trusts its header. Only use easyauth when the
+  // site is configured to require authentication, otherwise the header can be forged.
+  AUTH_MODE: z.enum(["builtin", "easyauth"]).default("builtin"),
+  KEY_VAULT_URI: z.string().optional(),
+  PUBLIC_BASE_URL: z.string().optional(),
+  SETTINGS_FILE: z.string().optional(),
 });
 
 export type AppEnv = z.infer<typeof schema> & { subscriptionIds: string[] };

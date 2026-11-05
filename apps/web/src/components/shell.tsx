@@ -1,6 +1,6 @@
 "use client";
 
-import { Activity, LayoutDashboard, Search, ScrollText, ServerCog, RefreshCw, Info, Users } from "lucide-react";
+import { Activity, LayoutDashboard, Search, ScrollText, ServerCog, RefreshCw, Info, Users, Settings as Cog, LogOut } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
@@ -46,6 +46,7 @@ export function Shell({ children }: { children: ReactNode }) {
   }, []);
 
   const stuck = data?.summary.stuck ?? 0;
+  const nav = data?.me.isAdmin ? [...NAV, { href: "/settings", label: "Settings", Icon: Cog }] : NAV;
   const isActive = (href: string) => (href === "/" ? path === "/" : path.startsWith(href));
 
   return (
@@ -55,7 +56,7 @@ export function Shell({ children }: { children: ReactNode }) {
       <aside className="sticky top-0 hidden h-screen flex-col gap-6 border-r border-[var(--border)] bg-[var(--surface)] p-5 backdrop-blur-xl lg:flex" aria-label="Primary">
         <Logo />
         <nav className="flex flex-col gap-1">
-          {NAV.map(({ href, label, Icon }) => {
+          {nav.map(({ href, label, Icon }) => {
             const active = isActive(href);
             return (
               <Link key={href} href={href} aria-current={active ? "page" : undefined}
@@ -73,6 +74,9 @@ export function Shell({ children }: { children: ReactNode }) {
             <div className="rounded-xl border border-[var(--border)] p-3">
               <div className="font-medium text-[var(--text)]">{data.me.name}</div>
               <div>{data.me.roles.join(", ") || "No role"}</div>
+              {data.source !== "demo" && (
+                <form method="post" action="/auth/logout" className="mt-2"><button className="inline-flex items-center gap-1.5 text-[var(--muted)] hover:text-[var(--text)]"><LogOut size={13} /> Sign out</button></form>
+              )}
             </div>
           )}
         </div>

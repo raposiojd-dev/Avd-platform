@@ -1,7 +1,5 @@
 import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
-import { FleetProvider } from "@/components/fleet-context";
-import { Shell } from "@/components/shell";
 import { THEME_INIT } from "@/components/theme";
 import { PRODUCT_NAME, PRODUCT_TAGLINE } from "@/lib/product";
 import "./globals.css";
@@ -13,9 +11,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en" data-theme="dark" suppressHydrationWarning>
       <head><script dangerouslySetInnerHTML={{ __html: THEME_INIT }} /></head>
-      <body>
-        <FleetProvider><Shell>{children}</Shell></FleetProvider>
-      </body>
+      <body>{children}</body>
     </html>
   );
 }

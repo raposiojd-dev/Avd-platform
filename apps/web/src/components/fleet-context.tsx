@@ -45,6 +45,7 @@ export function FleetProvider({ children }: { children: ReactNode }) {
     try {
       const res = await fetch("/api/fleet", { cache: "no-store" });
       if (res.status === 401) { setError("Your session has ended. Reload the page to sign in again."); return; }
+      if (res.status === 403) { setError("You are signed in but have no role yet. Ask an administrator to assign you Reader, Operator or Admin."); setLoading(false); return; }
       if (!res.ok) { setError("Could not load the fleet right now. Retrying."); return; }
       setData((await res.json()) as FleetResponse);
       setError(null);
