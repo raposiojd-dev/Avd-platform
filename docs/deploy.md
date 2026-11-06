@@ -1,6 +1,6 @@
 # Putting Tidewatch online (your own Azure subscription)
 
-Status: the template compiles and the app builds and passes its tests, but a full deployment into a clean subscription has not been run yet. Do the first one in a test subscription.
+Status: first real deployment done on 2026-11-06 into a personal test subscription from Azure Cloud Shell (australiaeast, B1 plan, 30-day logs): `az deployment sub validate` and `create` succeeded, the app published and `/api/health` and the Setup page load. Sign-in and fleet reads are not yet tested against real Entra and AVD.
 
 You need: Owner (or Contributor plus User Access Administrator) on the target subscription, and an Entra app registration you can edit.
 
@@ -29,3 +29,8 @@ Set `enableWebActions=true` and, if you want automatic fixing, `watchdogMode=Rem
 - Setup says "Microsoft rejected these details": the message includes Microsoft's error code (for example AADSTS7000215 = wrong secret value, AADSTS700016 = wrong client ID).
 - Sign-in says the redirect URI does not match: the URI in the app registration must equal the one shown on the Setup/Settings page exactly.
 - You see "signed in but have no role": you are not the setup email and have no app role yet.
+
+## Cloud Shell notes (learned on the first deploy)
+- Azure Cloud Shell sets `NODE_ENV=development`, which makes `next build` fail on the `/_global-error` prerender. Run `export NODE_ENV=production` before `npm run build`.
+- `az webapp deploy --type zip` uploaded and started the app but then sat polling for status for 10+ minutes. Check `https://<app>/api/health`; if it returns `{"ok":true}` the deploy worked and you can stop the command. A scripted deploy with a status timeout is on the Release Engineer's list.
+- Cheapest test settings: `webPlanSku = 'B1'`, `logRetentionDays = 30`, `keyVaultRetentionDays = 7`. Delete the resource groups when finished.
